@@ -1,4 +1,4 @@
-pragma solidity ^0.5.1;
+pragma solidity ^0.5.0;
 
 contract doubleAuction {
   address owner;
@@ -7,9 +7,4 @@ contract doubleAuction {
     owner = msg.sender;
   }
   
-  
-    
-    
-    
-    
 }
