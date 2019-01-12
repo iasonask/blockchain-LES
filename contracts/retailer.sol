@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity >=0.4.25 <0.6.0;
 
 contract retailer {
   
@@ -23,12 +23,13 @@ contract retailer {
   uint256 t2;
   uint256 t3;
   uint256 t4;
-  uint256 productionBalance = 0;
-  uint256 consumptionBalance = 0;
   uint256 price;
   uint256 deposit;
 
+  // event to inform smart meters for declaring energy consumption
   event subscription (address meter, address user, uint256 t2, uint256 t3);
+
+  // event to inform consumers for subscribing in the energy service
   event deployEnergyContract (address retailer_con, uint256 price, uint256 t1, uint256 t2, uint256 t3, uint256 t4);
 
   //retailer deploys contract and defines the various time parameters
@@ -44,7 +45,7 @@ contract retailer {
     emit deployEnergyContract (address(this), price, t1, t2, t3, t4);
   }
   
-  // subscribe new users only between t0 and t1
+  // subscribe new users only in timeframe between t0 and t1
   function subscribeUser (address meterID_) public onlySubscription payable {
     require(msg.value >= deposit, "Insufficient deposit.");
     consumers[msg.sender] = consumer(msg.sender, 0, meterID_, msg.value, true, false, false);
@@ -61,16 +62,21 @@ contract retailer {
 
   // users pay correct amount in order to receive their initial deposits
   function paymentPeriod () public onlyPayment payable {
-    require(consumers[msg.sender].activeConsumption*price == msg.value, "Insufficient funds.");
+    require(consumers[msg.sender].activeConsumption*price <= msg.value, "Insufficient funds.");
     require(!consumers[msg.sender].hasPayed, "User has already payed.");
     consumers[msg.sender].hasPayed = true;
     //return deposit to user
     msg.sender.transfer(consumers[msg.sender].deposit);
+    if (consumers[msg.sender].activeConsumption*price < msg.value) {
+      // return possibly exceeding funds
+      msg.sender.transfer(msg.value - consumers[msg.sender].activeConsumption*price);
+    }
   }
 
+  // the retailer can acquire the users payments after t4 and destruct the contract
   function finalize() public onlyOwner {
     require(getBlockNumber() >= t4, "Period for finalization has not been reached yer.");
-    destruct();
+    selfdestruct(msg.sender);
   }
 
   // boolean functions for checking the differnt time periods
@@ -112,8 +118,4 @@ contract retailer {
     require(msg.sender == owner, "Only retailer can modify!");
     _;
   }
-
-  function destruct() public onlyOwner {
-    selfdestruct(msg.sender);
-  } 
 }
