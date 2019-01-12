@@ -36,10 +36,10 @@ contract retailer {
   constructor (uint256 t1_, uint256 t2_, uint256 t3_, uint256 t4_, uint256 price_, uint256 deposit_) public {
     owner = msg.sender;
     t0 = getBlockNumber();
-    t1 = t1_;
-    t2 = t2_;
-    t3 = t3_;
-    t4 = t4_;
+    t1 = t0 + t1_;
+    t2 = t1 + t2_;
+    t3 = t2 + t3_;
+    t4 = t3 + t4_;
     price = price_;
     deposit = deposit_;
     emit deployEnergyContract (address(this), price, t1, t2, t3, t4);
