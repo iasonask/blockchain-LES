@@ -68,6 +68,7 @@ contract retailer {
   function declarePeriod (address user, uint256 activeP_, bytes memory meterSig) public onlyDeclare {
     require(isValidMeter(msg.sender), "Not a valid smart meter");
     require(isValidMeterSig(user, activeP_, meterSig), "Not a valid meter signature.");
+    require(!consumers[user].hasDeclared, "Meter has already declared.");
     require(consumers[user].meter == msg.sender, "Address of meter is different from the initialy declared.");
     consumers[user].activeConsumption = activeP_;
     consumers[user].hasDeclared = true;
