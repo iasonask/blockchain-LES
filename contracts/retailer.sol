@@ -27,10 +27,10 @@ contract retailer {
   uint256 deposit;
 
   // event to inform smart meters for declaring energy consumption
-  event subscription (address meter, address user, uint256 t2, uint256 t3);
+  event subscription(address meter, address user, uint256 t2, uint256 t3);
 
   // event to inform consumers for subscribing in the energy service
-  event deployEnergyContract (address retailer_con, uint256 price, uint256 t1, uint256 t2, uint256 t3, uint256 t4);
+  event deployEnergyContract(address retailer_con, uint256 price, uint256 t1, uint256 t2, uint256 t3, uint256 t4);
 
   //retailer deploys contract and defines the various time parameters
   constructor (uint256 t1_, uint256 t2_, uint256 t3_, uint256 t4_, uint256 price_, uint256 deposit_) public {

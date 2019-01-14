@@ -2,8 +2,9 @@ pragma solidity >=0.4.25 <0.6.0;
 
 contract doubleAuction {
   address owner;
+  uint256 constant INITIAL_DEPOSIT = 0; //
 
-  // bidders data
+  // sellers data
   struct seller {
     address seller_;
     bytes32 bidValue;
@@ -11,12 +12,17 @@ contract doubleAuction {
     address meter;
     uint256 deposit;
     bool isSubscribed;
+    bool isTrading;
+    uint256 volToTrade;
+    uint256 measuredVol;
+    bool hasBeenPayed;
   }
   mapping(address => seller) sellers;
   address[] sellersArr;
   uint256[] sellBids;
-  uint sellVolume = 0; 
+  uint256 sellVolume = 0; 
 
+  // buyers data
   struct buyer {
     address buyer_;
     bytes32 bidValue;
@@ -24,51 +30,68 @@ contract doubleAuction {
     address meter;
     uint256 deposit;
     bool isSubscribed;
+    bool isTrading;
+    uint256 volToTrade;
+    uint256 measuredVol;
+    bool hasPayed;
   }
   mapping(address => buyer) buyers;
   address[] buyersArr;
   uint256[] buyBids;
   uint256 buyVolume = 0;
 
+  // smart meters
+
+
   // UC related parameters
   uint256 t0;
   uint256 t1;
   uint256 t2;
   uint256 t3;
+  uint256 t4;
+  uint256 t5;
+  uint256 t6;
   uint256 deposit;
   uint256 price;
   
   // event to inform smart meters for declaring energy consumption
-  event subscription (address meter, address user, uint256 t2, uint256 t3);
+  event subscriptionBuyer(address meter, address user, uint256 t3, uint256 t4,  uint256 t5);
+  event subscriptionSeller(address meter, address user, uint256 t3, uint256 t4,  uint256 t5);
 
   // event to inform consumers for participating in the energy auction
-  event deployEnergyAuction (address retailer_con, uint256 t1, uint256 t2, uint256 t3);
+  event deployEnergyAuction(address retailer_con, uint256 t1, uint256 t2, uint256 t3, uint256 t4,  uint256 t5, uint256 t6);
 
   // inform potential buyers and sellers for trading
   event tradeEnergyBuyer(address buyer, uint256 energyVolume);
   event tradeEnergySeller(address seller, uint256 energyVolume);
 
-  constructor (uint256 t1_, uint256 t2_, uint256 t3_, uint256 deposit_) public {
+  constructor (uint256 t1_, uint256 t2_, uint256 t3_,  uint256 t4_, uint256 t5_,  uint256 t6_, uint256 deposit_) public payable {
+    require(msg.value >= INITIAL_DEPOSIT, "Contract instantiation requires INITIAL_DEPOSIT.");
     owner = msg.sender;
     t0 = getBlockNumber();
     t1 = t0 + t1_;
     t2 = t1 + t2_;
     t3 = t2 + t3_;
+    t4 = t3 + t4_;
+    t5 = t4 + t5_;
+    t6 = t5 + t6_;
     deposit = deposit_;
-    emit deployEnergyAuction (address(this), t1, t2, t3);
+    emit deployEnergyAuction (address(this), t1, t2, t3, t4, t5, t6);
   }
 
   //make bids
   function bidSeller(bytes32 bid, address meter, uint256 energy) public onlyBidding payable {
     // need to check for negative energy volume?? how?
     require(msg.value >= deposit, "Insufficient deposit.");
-    sellers[msg.sender] = seller(msg.sender, bid, energy, meter, msg.value, true);
+    //require(isValidMeter(meter), "Meter not valid.");
+    sellers[msg.sender] = seller(msg.sender, bid, energy, meter, msg.value, true, false, 0, 0, false);
     sellersArr.push(msg.sender);
   }
 
   function bidBuyer(bytes32 bid, address meter, uint256 energy) public onlyBidding payable {
     require(msg.value >= deposit, "Insufficient deposit.");
-    buyers[msg.sender] = buyer(msg.sender, bid, energy, meter, msg.value, true);
+    //require(isValidMeter(meter), "Meter not valid.");
+    buyers[msg.sender] = buyer(msg.sender, bid, energy, meter, msg.value, true, false, 0, 0, false);
     buyersArr.push(msg.sender);
   }
 
@@ -92,7 +115,7 @@ contract doubleAuction {
     (buyBids, buyersArr) = bidSortDescenting(buyBids, buyersArr);
     // calculate total energy volume
     uint256 i;
-    for (uint i = 0; i < buyBids.length; i++) {
+    for (i = 0; i < buyBids.length; i++) {
       buyVolume += buyers[buyersArr[i]].energy;
     }
   }
@@ -102,7 +125,7 @@ contract doubleAuction {
 
     // construct demand and supply curves
     uint256 maxVol = max(buyVolume, sellVolume);
-    uint i;
+    uint256 i;
 
     uint256[] memory buyPrices = new uint[](maxVol);
     uint256 j_buy = 0;
@@ -156,18 +179,23 @@ contract doubleAuction {
 
     // volume that will be traded
     uint256 vol = min(buyVolume, sellVolume);
+
     // trade: find matching buy bids
     i = 0;
     uint256 tempVol = vol;
     while (tempVol > 0) {
       if (buyers[buyersArr[i]].energy <= tempVol) {
-        //Matching buyer and Quantity
         tempVol -= buyers[buyersArr[i]].energy;
+        buyers[buyersArr[i]].isTrading = true;
+        buyers[buyersArr[i]].volToTrade = buyers[buyersArr[i]].energy;
         emit tradeEnergyBuyer(buyersArr[i], buyers[buyersArr[i]].energy);
+        emit subscriptionBuyer(buyers[buyersArr[i]].meter, buyersArr[i], t3, t4, t5);
         i++;
       } else {
-        //Matching buyer and Quantity
+        buyers[buyersArr[i]].isTrading = true;
+        buyers[buyersArr[i]].volToTrade = buyers[buyersArr[i]].energy;
         emit tradeEnergyBuyer(buyersArr[i], tempVol);
+        emit subscriptionBuyer(buyers[buyersArr[i]].meter, buyersArr[i], t3, t4, t5);
         break;
       }
     }
@@ -177,17 +205,60 @@ contract doubleAuction {
     tempVol = vol;
     while (tempVol > 0) {
       if (sellers[sellersArr[i]].energy <= tempVol) {
-        // Matching seller and Quantity
         tempVol -= sellers[sellersArr[i]].energy;
+        sellers[sellersArr[i]].isTrading = true;
+        sellers[sellersArr[i]].volToTrade = sellers[sellersArr[i]].energy;
         emit tradeEnergySeller(sellersArr[i], sellers[sellersArr[i]].energy);
+        emit subscriptionSeller(sellers[sellersArr[i]].meter, sellersArr[i], t3, t4, t5);
         i++;
       } else {
-        // Matching seller and Quantity
+        sellers[sellersArr[i]].isTrading = true;
+        sellers[sellersArr[i]].volToTrade = tempVol;
         emit tradeEnergySeller(sellersArr[i], tempVol);
+        emit subscriptionSeller(sellers[sellersArr[i]].meter, sellersArr[i], t3, t4, t5);
         break;
       }
     }
+  }
 
+  function energyDeclarationsBuyers(address buyer_, uint256 volume /*,bytes32 meterSig */) public onlyDeclare {
+    //require(isValidMeter(msg.sender), "Not a valid smart meter");
+    //require(isValidMeterSig(volume, meterSig ), "Not a valid meter signature.");
+    buyers[buyer_].measuredVol = volume;
+  }
+
+  function energyDeclarationsSellers(address seller_, uint256 volume /*,bytes32 meterSig */) public onlyDeclare {
+    //require(isValidMeter(msg.sender), "Not a valid smart meter");
+    //require(isValidMeterSig(volume, meterSig ), "Not a valid meter signature.");
+    sellers[seller_].measuredVol = volume;
+  }
+
+  // buyers send their payments
+  function sendPayment() public onlyPay payable {
+    require(buyers[msg.sender].isSubscribed, "Buyer is not subscribed!");
+    require(!buyers[msg.sender].hasPayed, "Buyer has payed.");
+    require(msg.value >= price*buyers[msg.sender].volToTrade, "Not enough funds.");
+    require(buyers[msg.sender].isTrading, "Buyer cannot trade.");
+    // refund user
+    if (msg.value > price*buyers[msg.sender].volToTrade) {
+      msg.sender.transfer(msg.value - price*buyers[msg.sender].volToTrade);
+    }
+    // return also initial deposit
+    msg.sender.transfer(buyers[msg.sender].deposit);
+    buyers[msg.sender].hasPayed = true;    
+  }
+
+  function receivePayment() public onlyPay {
+    require(sellers[msg.sender].isSubscribed, "Seller is not subscribed!");
+    require(!sellers[msg.sender].hasBeenPayed, "Seller has been payed.");
+    require(sellers[msg.sender].isTrading, "Seller cannot trade.");
+    // refund seller
+    uint256 refund = price*min(sellers[msg.sender].measuredVol, sellers[msg.sender].volToTrade);
+    msg.sender.transfer(refund);
+    
+    // return also initial deposit
+    msg.sender.transfer(sellers[msg.sender].deposit);
+    sellers[msg.sender].hasBeenPayed = true;
   }
 
   function getPrice() public view returns (uint256) {
@@ -199,12 +270,13 @@ contract doubleAuction {
     return keccak256(abi.encodePacked(nonce, bidValue));
   }
 
+  // detroy contract
   function finalize() public onlyOwner {
-    require(getBlockNumber() >= t3, "Finalization period has not yet arrived.");
+    require(isFinalizationPeriod(), "Finalization period has not yet arrived.");
     selfdestruct(msg.sender);
   }
 
-  // sort bids as they are revealed
+  // sort bids as they are being revealed
   function bidSortAscenting(uint[] memory arr, address[] memory bidders) internal pure returns (uint[] memory, address[] memory) { 
     uint256 n = arr.length;
     uint256 i = n-1;
@@ -257,11 +329,23 @@ contract doubleAuction {
   }
 
   function isRevealPeriod() public view returns (bool) {
-    return (getBlockNumber() < t3) && (getBlockNumber() >= t2);
+    return (getBlockNumber() < t2) && (getBlockNumber() >= t1);
   }
 
   function isMatchingPeriod() public view returns (bool) {
-    return (getBlockNumber() >= t3);
+    return  (getBlockNumber() < t3) && (getBlockNumber() >= t2);
+  }
+
+  function isDeclarationPeriod() public view returns (bool) {
+    return (getBlockNumber() < t5) && (getBlockNumber() >= t4);
+  }
+
+  function isPaymentPeriod() public view returns (bool) {
+    return (getBlockNumber() < t6) && (getBlockNumber() >= t5);
+  }
+
+  function isFinalizationPeriod() public view returns (bool) {
+    return (getBlockNumber() >= t6);
   }
 
   function getBlockNumber() public view returns (uint256) {
@@ -275,12 +359,22 @@ contract doubleAuction {
   }
 
   modifier onlyReveal {
-    require(isRevealPeriod(), "Declaration period has not started or has already ended.");
+    require(isRevealPeriod(), "Reveal period has not started or has already ended.");
     _;
   }
 
   modifier onlyMatching {
     require(isMatchingPeriod(), "Matching period has not started or has already ended.");
+    _;
+  }
+
+  modifier onlyDeclare {
+    require(isDeclarationPeriod(), "Declaration period has not started or has already ended.");
+    _;
+  }
+
+  modifier onlyPay {
+    require(isPaymentPeriod(), "Payment period has not started or has already ended.");
     _;
   }
 
