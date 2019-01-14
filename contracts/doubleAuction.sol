@@ -54,6 +54,7 @@ contract doubleAuction {
 
   //make bids
   function bidSeller(bytes32 bid, address meter, uint256 energy) public onlyBidding payable {
+    // need to check for negative energy volume?? how?
     require(msg.value >= deposit, "Insufficient deposit.");
     sellers[msg.sender] = seller(msg.sender, bid, energy, meter, msg.value, true);
     sellersArr.push(msg.sender);
