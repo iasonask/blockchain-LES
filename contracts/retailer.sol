@@ -48,13 +48,16 @@ contract retailer {
   // subscribe new users only in timeframe between t0 and t1
   function subscribeUser (address meterID_) public onlySubscription payable {
     require(msg.value >= deposit, "Insufficient deposit.");
+    //require(isValidMeter(meter), "Meter not valid.");
     consumers[msg.sender] = consumer(msg.sender, 0, meterID_, msg.value, true, false, false);
     users.push(msg.sender);
     emit subscription(meterID_, msg.sender, t2, t3);
   }
 
   // smart meters declare autonomously their consumption
-  function declarePeriod (address user, uint256 activeP_) public onlyDeclare {
+  function declarePeriod (address user, uint256 activeP_, bytes32 meterSig) public onlyDeclare {
+    require(isValidMeter(msg.sender), "Not a valid smart meter");
+    require(isValidMeterSig(user, activeP_, meterSig), "Not a valid meter signature.");
     require(consumers[user].meter == msg.sender, "Address of meter is different than the initialy declared.");
     consumers[user].activeConsumption = activeP_;
     consumers[user].hasDeclared = true;
@@ -77,6 +80,16 @@ contract retailer {
   function finalize() public onlyOwner {
     require(getBlockNumber() >= t4, "Period for finalization has not been reached yer.");
     selfdestruct(msg.sender);
+  }
+
+  function isValidMeter(address user) public pure returns(bool) {
+    //TODO
+    return true;
+  }
+  
+  function isValidMeterSig(address user, uint256 volume, bytes32 meterSig) public pure returns(bool) {
+    //TODO
+    return true;
   }
 
   // boolean functions for checking the differnt time periods

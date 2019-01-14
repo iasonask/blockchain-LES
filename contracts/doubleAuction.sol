@@ -2,11 +2,10 @@ pragma solidity >=0.4.25 <0.6.0;
 
 contract doubleAuction {
   address owner;
-  uint256 constant INITIAL_DEPOSIT = 0; //
+  uint256 constant INITIAL_DEPOSIT = 0;
 
   // sellers data
   struct seller {
-    address seller_;
     bytes32 bidValue;
     uint256 energy;
     address meter;
@@ -15,6 +14,7 @@ contract doubleAuction {
     bool isTrading;
     uint256 volToTrade;
     uint256 measuredVol;
+    bool hasDeclared;
     bool hasBeenPayed;
   }
   mapping(address => seller) sellers;
@@ -24,7 +24,6 @@ contract doubleAuction {
 
   // buyers data
   struct buyer {
-    address buyer_;
     bytes32 bidValue;
     uint256 energy;
     address meter;
@@ -33,6 +32,7 @@ contract doubleAuction {
     bool isTrading;
     uint256 volToTrade;
     uint256 measuredVol;
+    bool hasDeclared;
     bool hasPayed;
   }
   mapping(address => buyer) buyers;
@@ -84,14 +84,14 @@ contract doubleAuction {
     // need to check for negative energy volume?? how?
     require(msg.value >= deposit, "Insufficient deposit.");
     //require(isValidMeter(meter), "Meter not valid.");
-    sellers[msg.sender] = seller(msg.sender, bid, energy, meter, msg.value, true, false, 0, 0, false);
+    sellers[msg.sender] = seller(bid, energy, meter, msg.value, true, false, 0, 0, false, false);
     sellersArr.push(msg.sender);
   }
 
   function bidBuyer(bytes32 bid, address meter, uint256 energy) public onlyBidding payable {
     require(msg.value >= deposit, "Insufficient deposit.");
     //require(isValidMeter(meter), "Meter not valid.");
-    buyers[msg.sender] = buyer(msg.sender, bid, energy, meter, msg.value, true, false, 0, 0, false);
+    buyers[msg.sender] = buyer(bid, energy, meter, msg.value, true, false, 0, 0, false, false);
     buyersArr.push(msg.sender);
   }
 
@@ -221,15 +221,19 @@ contract doubleAuction {
     }
   }
 
-  function energyDeclarationsBuyers(address buyer_, uint256 volume /*,bytes32 meterSig */) public onlyDeclare {
-    //require(isValidMeter(msg.sender), "Not a valid smart meter");
-    //require(isValidMeterSig(volume, meterSig ), "Not a valid meter signature.");
+  function energyDeclarationsBuyers(address buyer_, uint256 volume, bytes32 meterSig) public onlyDeclare {
+    require(!buyers[buyer_].hasDeclared, "Buyer has already declared.");
+    require(isValidMeter(msg.sender), "Not a valid smart meter");
+    require(isValidMeterSig(buyer_, volume, meterSig), "Not a valid meter signature.");
+    require(buyers[buyer_].meter == msg.sender, "Address of meter is different than the initialy declared.");
     buyers[buyer_].measuredVol = volume;
   }
 
-  function energyDeclarationsSellers(address seller_, uint256 volume /*,bytes32 meterSig */) public onlyDeclare {
-    //require(isValidMeter(msg.sender), "Not a valid smart meter");
-    //require(isValidMeterSig(volume, meterSig ), "Not a valid meter signature.");
+  function energyDeclarationsSellers(address seller_, uint256 volume, bytes32 meterSig) public onlyDeclare {
+    require(!sellers[seller_].hasDeclared, "Seller has already declared.");
+    require(isValidMeter(msg.sender), "Not a valid smart meter");
+    require(isValidMeterSig(seller_, volume, meterSig), "Not a valid meter signature.");
+    require(sellers[seller_].meter == msg.sender, "Address of meter is different than the initialy declared.");
     sellers[seller_].measuredVol = volume;
   }
 
@@ -270,6 +274,16 @@ contract doubleAuction {
     return keccak256(abi.encodePacked(nonce, bidValue));
   }
 
+  function isValidMeter(address user) public pure returns(bool) {
+    //TODO
+    return true;
+  }
+  
+  function isValidMeterSig(address user, uint256 volume, bytes32 meterSig) public pure returns(bool) {
+    //TODO
+    return true;
+  }
+
   // detroy contract
   function finalize() public onlyOwner {
     require(isFinalizationPeriod(), "Finalization period has not yet arrived.");
@@ -277,7 +291,7 @@ contract doubleAuction {
   }
 
   // sort bids as they are being revealed
-  function bidSortAscenting(uint[] memory arr, address[] memory bidders) internal pure returns (uint[] memory, address[] memory) { 
+  function bidSortAscenting(uint[] memory arr, address[] memory bidders) private pure returns (uint[] memory, address[] memory) { 
     uint256 n = arr.length;
     uint256 i = n-1;
     uint256 key = arr[i];
@@ -296,7 +310,7 @@ contract doubleAuction {
     return (arr, bidders);
   }
 
-  function bidSortDescenting(uint[] memory arr, address[] memory bidders) internal pure returns (uint[] memory, address[] memory) { 
+  function bidSortDescenting(uint[] memory arr, address[] memory bidders) private pure returns (uint[] memory, address[] memory) { 
     uint256 n = arr.length;
     uint256 i = n-1;
     uint256 key = arr[i];
@@ -324,31 +338,31 @@ contract doubleAuction {
   }
 
   // boolean functions for checking the differnt time periods
-  function isBiddingPeriod() public view returns (bool) {
+  function isBiddingPeriod() private view returns (bool) {
     return (getBlockNumber() < t1) && (getBlockNumber() >= t0);
   }
 
-  function isRevealPeriod() public view returns (bool) {
+  function isRevealPeriod() private view returns (bool) {
     return (getBlockNumber() < t2) && (getBlockNumber() >= t1);
   }
 
-  function isMatchingPeriod() public view returns (bool) {
+  function isMatchingPeriod() private view returns (bool) {
     return  (getBlockNumber() < t3) && (getBlockNumber() >= t2);
   }
 
-  function isDeclarationPeriod() public view returns (bool) {
+  function isDeclarationPeriod() private view returns (bool) {
     return (getBlockNumber() < t5) && (getBlockNumber() >= t4);
   }
 
-  function isPaymentPeriod() public view returns (bool) {
+  function isPaymentPeriod() private view returns (bool) {
     return (getBlockNumber() < t6) && (getBlockNumber() >= t5);
   }
 
-  function isFinalizationPeriod() public view returns (bool) {
+  function isFinalizationPeriod() private view returns (bool) {
     return (getBlockNumber() >= t6);
   }
 
-  function getBlockNumber() public view returns (uint256) {
+  function getBlockNumber() private view returns (uint256) {
     return block.number;
   }
 
