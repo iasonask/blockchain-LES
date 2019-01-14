@@ -1,5 +1,11 @@
 pragma solidity >=0.4.25 <0.6.0;
 
+import "./ECRecovery.sol";
+
+contract smartMeters {
+  function isValidMeter(address) public pure returns (bool) {}
+}
+
 contract retailer {
   
   //retailer address
@@ -26,6 +32,9 @@ contract retailer {
   uint256 price;
   uint256 deposit;
 
+  // smart meters
+  smartMeters smartMeterContract;
+
   // event to inform smart meters for declaring energy consumption
   event subscription(address meter, address user, uint256 t2, uint256 t3);
 
@@ -33,7 +42,7 @@ contract retailer {
   event deployEnergyContract(address retailer_con, uint256 price, uint256 t1, uint256 t2, uint256 t3, uint256 t4);
 
   //retailer deploys contract and defines the various time parameters
-  constructor (uint256 t1_, uint256 t2_, uint256 t3_, uint256 t4_, uint256 price_, uint256 deposit_) public {
+  constructor (address meterProvider, uint256 t1_, uint256 t2_, uint256 t3_, uint256 t4_, uint256 price_, uint256 deposit_) public {
     owner = msg.sender;
     t0 = getBlockNumber();
     t1 = t0 + t1_;
@@ -42,6 +51,7 @@ contract retailer {
     t4 = t3 + t4_;
     price = price_;
     deposit = deposit_;
+    smartMeterContract = smartMeters(meterProvider);
     emit deployEnergyContract (address(this), price, t1, t2, t3, t4);
   }
   
@@ -55,10 +65,10 @@ contract retailer {
   }
 
   // smart meters declare autonomously their consumption
-  function declarePeriod (address user, uint256 activeP_, bytes32 meterSig) public onlyDeclare {
+  function declarePeriod (address user, uint256 activeP_, bytes memory meterSig) public onlyDeclare {
     require(isValidMeter(msg.sender), "Not a valid smart meter");
     require(isValidMeterSig(user, activeP_, meterSig), "Not a valid meter signature.");
-    require(consumers[user].meter == msg.sender, "Address of meter is different than the initialy declared.");
+    require(consumers[user].meter == msg.sender, "Address of meter is different from the initialy declared.");
     consumers[user].activeConsumption = activeP_;
     consumers[user].hasDeclared = true;
   }
@@ -82,14 +92,13 @@ contract retailer {
     selfdestruct(msg.sender);
   }
 
-  function isValidMeter(address user) public pure returns(bool) {
-    //TODO
-    return true;
+  function isValidMeter(address meter) public view returns(bool) {
+    return smartMeterContract.isValidMeter(meter);
   }
   
-  function isValidMeterSig(address user, uint256 volume, bytes32 meterSig) public pure returns(bool) {
-    //TODO
-    return true;
+  function isValidMeterSig(address user, uint256 volume, bytes memory meterSig) public pure returns(bool) {
+    bytes32 hash_ = keccak256(abi.encodePacked(user, volume));
+    return user == ECRecovery.recover(hash_, meterSig);
   }
 
   // boolean functions for checking the differnt time periods

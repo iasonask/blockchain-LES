@@ -1,5 +1,11 @@
 pragma solidity >=0.4.25 <0.6.0;
 
+import "./ECRecovery.sol";
+
+contract smartMeters {
+  function isValidMeter(address) public pure returns (bool) {}
+}
+
 contract doubleAuction {
   address owner;
   uint256 constant INITIAL_DEPOSIT = 0;
@@ -41,7 +47,7 @@ contract doubleAuction {
   uint256 buyVolume = 0;
 
   // smart meters
-
+  smartMeters smartMeterContract;
 
   // UC related parameters
   uint256 t0;
@@ -65,7 +71,9 @@ contract doubleAuction {
   event tradeEnergyBuyer(address buyer, uint256 energyVolume);
   event tradeEnergySeller(address seller, uint256 energyVolume);
 
-  constructor (uint256 t1_, uint256 t2_, uint256 t3_,  uint256 t4_, uint256 t5_,  uint256 t6_, uint256 deposit_) public payable {
+  constructor (address meterProvider, uint256 t1_, uint256 t2_, 
+  uint256 t3_,  uint256 t4_, uint256 t5_,  uint256 t6_, 
+  uint256 deposit_) public payable {
     require(msg.value >= INITIAL_DEPOSIT, "Contract instantiation requires INITIAL_DEPOSIT.");
     owner = msg.sender;
     t0 = getBlockNumber();
@@ -76,6 +84,7 @@ contract doubleAuction {
     t5 = t4 + t5_;
     t6 = t5 + t6_;
     deposit = deposit_;
+    smartMeterContract = smartMeters(meterProvider);
     emit deployEnergyAuction (address(this), t1, t2, t3, t4, t5, t6);
   }
 
@@ -126,11 +135,12 @@ contract doubleAuction {
     // construct demand and supply curves
     uint256 maxVol = max(buyVolume, sellVolume);
     uint256 i;
+    uint256 tempVol;
 
     uint256[] memory buyPrices = new uint[](maxVol);
     uint256 j_buy = 0;
     for (i = 0; i < buyBids.length; i++) {
-      uint256 tempVol = buyers[buyersArr[i]].energy;
+      tempVol = buyers[buyersArr[i]].energy;
       while (tempVol > 0) {
         buyPrices[j_buy] = buyBids[i];
         tempVol--;
@@ -141,7 +151,7 @@ contract doubleAuction {
     uint256[] memory sellPrices = new uint[](maxVol);
     uint256 j_sell = 0;
     for (i = 0; i < sellBids.length; i++) {
-      uint256 tempVol = sellers[sellersArr[i]].energy;
+      tempVol = sellers[sellersArr[i]].energy;
       while (tempVol > 0) {
         sellPrices[j_sell] = sellBids[i];
         tempVol--;
@@ -182,7 +192,7 @@ contract doubleAuction {
 
     // trade: find matching buy bids
     i = 0;
-    uint256 tempVol = vol;
+    tempVol = vol;
     while (tempVol > 0) {
       if (buyers[buyersArr[i]].energy <= tempVol) {
         tempVol -= buyers[buyersArr[i]].energy;
@@ -221,7 +231,7 @@ contract doubleAuction {
     }
   }
 
-  function energyDeclarationsBuyers(address buyer_, uint256 volume, bytes32 meterSig) public onlyDeclare {
+  function energyDeclarationsBuyers(address buyer_, uint256 volume, bytes memory meterSig) public onlyDeclare {
     require(!buyers[buyer_].hasDeclared, "Buyer has already declared.");
     require(isValidMeter(msg.sender), "Not a valid smart meter");
     require(isValidMeterSig(buyer_, volume, meterSig), "Not a valid meter signature.");
@@ -229,7 +239,7 @@ contract doubleAuction {
     buyers[buyer_].measuredVol = volume;
   }
 
-  function energyDeclarationsSellers(address seller_, uint256 volume, bytes32 meterSig) public onlyDeclare {
+  function energyDeclarationsSellers(address seller_, uint256 volume, bytes memory meterSig) public onlyDeclare {
     require(!sellers[seller_].hasDeclared, "Seller has already declared.");
     require(isValidMeter(msg.sender), "Not a valid smart meter");
     require(isValidMeterSig(seller_, volume, meterSig), "Not a valid meter signature.");
@@ -274,14 +284,13 @@ contract doubleAuction {
     return keccak256(abi.encodePacked(nonce, bidValue));
   }
 
-  function isValidMeter(address user) public pure returns(bool) {
-    //TODO
-    return true;
+  function isValidMeter(address meter) public view returns(bool) {
+    return smartMeterContract.isValidMeter(meter);
   }
   
-  function isValidMeterSig(address user, uint256 volume, bytes32 meterSig) public pure returns(bool) {
-    //TODO
-    return true;
+  function isValidMeterSig(address user, uint256 volume, bytes memory meterSig) public pure returns(bool) {
+    bytes32 hash_ = keccak256(abi.encodePacked(user, volume));
+    return user == ECRecovery.recover(hash_, meterSig);
   }
 
   // detroy contract
