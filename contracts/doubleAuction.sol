@@ -110,7 +110,7 @@ contract doubleAuction {
   }
 
   // sort bids as they are revealed
-  function bidSortAscenting(uint[] arr, address[] bidders) internal pure returns (uint[], address[]) { 
+  function bidSortAscenting(uint[] memory arr, address[] memory bidders) internal pure returns (uint[] memory, address[] memory) { 
     uint256 n = arr.length;
     uint256 i = n-1;
     uint256 key = arr[i];
@@ -129,7 +129,7 @@ contract doubleAuction {
     return (arr, bidders);
   }
 
-  function bidSortDescenting(uint[] arr, address[] bidders) internal pure returns (uint[], address[]) { 
+  function bidSortDescenting(uint[] memory arr, address[] memory bidders) internal pure returns (uint[] memory, address[] memory) { 
     uint256 n = arr.length;
     uint256 i = n-1;
     uint256 key = arr[i];
