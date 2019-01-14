@@ -15,6 +15,7 @@ contract doubleAuction {
   mapping(address => seller) sellers;
   address[] sellersArr;
   uint256[] sellBids;
+  uint sellVolume = 0; 
 
   struct buyer {
     address buyer_;
@@ -27,6 +28,7 @@ contract doubleAuction {
   mapping(address => buyer) buyers;
   address[] buyersArr;
   uint256[] buyBids;
+  uint256 buyVolume = 0;
 
   // UC related parameters
   uint256 t0;
@@ -35,12 +37,16 @@ contract doubleAuction {
   uint256 t3;
   uint256 deposit;
   uint256 price;
-
+  
   // event to inform smart meters for declaring energy consumption
   event subscription (address meter, address user, uint256 t2, uint256 t3);
 
   // event to inform consumers for participating in the energy auction
   event deployEnergyAuction (address retailer_con, uint256 t1, uint256 t2, uint256 t3);
+
+  // inform potential buyers and sellers for trading
+  event tradeEnergyBuyer(address buyer, uint256 energyVolume);
+  event tradeEnergySeller(address seller, uint256 energyVolume);
 
   constructor (uint256 t1_, uint256 t2_, uint256 t3_, uint256 deposit_) public {
     owner = msg.sender;
@@ -70,29 +76,118 @@ contract doubleAuction {
   function revealSeller(bytes32 nonce, uint256 bidValue) public onlyReveal {
     require(sellers[msg.sender].isSubscribed, "Seller has not committed bid.");
     require(makeCommitment(nonce, bidValue) == sellers[msg.sender].bidValue, "Invalid sell bid.");
-    require(bidValue >= 0, "Negative sell bid.");
     sellBids.push(bidValue);
     (sellBids, sellersArr) = bidSortAscenting(sellBids, sellersArr);
+    // calculate total energy volume
+    uint256 i;
+    for (i = 0; i < sellBids.length; i++) {
+      sellVolume += sellers[sellersArr[i]].energy;
+    }
   }
 
   function revealBuyer(bytes32 nonce, uint256 bidValue) public onlyReveal {
     require(buyers[msg.sender].isSubscribed, "Buyer has not committed bid.");
     require(makeCommitment(nonce, bidValue) == buyers[msg.sender].bidValue, "Invalid buy bid.");
-    require(bidValue >= 0, "Negative buy bid.");
     buyBids.push(bidValue);
     (buyBids, buyersArr) = bidSortDescenting(buyBids, buyersArr);
+    // calculate total energy volume
+    uint256 i;
+    for (uint i = 0; i < buyBids.length; i++) {
+      buyVolume += buyers[buyersArr[i]].energy;
+    }
   }
 
   // clear the market
-  function determinePrice() public onlyMatching {
-    uint256 energy = 0;
-    for (uint256 i = 0; i < buyBids.length; i++) {
-      if (buyers[buyersArr[i]].energy >= sellers[sellersArr[i]].energy) {
-        energy += buyers[buyersArr[i]].energy;
-      } else {
-        energy += sellers[sellersArr[i]].energy;
+  function clearMarket() public onlyMatching {
+
+    // construct demand and supply curves
+    uint256 maxVol = max(buyVolume, sellVolume);
+    uint i;
+
+    uint256[] memory buyPrices = new uint[](maxVol);
+    uint256 j_buy = 0;
+    for (i = 0; i < buyBids.length; i++) {
+      uint256 tempVol = buyers[buyersArr[i]].energy;
+      while (tempVol > 0) {
+        buyPrices[j_buy] = buyBids[i];
+        tempVol--;
+        j_buy++;
       }
     }
+    
+    uint256[] memory sellPrices = new uint[](maxVol);
+    uint256 j_sell = 0;
+    for (i = 0; i < sellBids.length; i++) {
+      uint256 tempVol = sellers[sellersArr[i]].energy;
+      while (tempVol > 0) {
+        sellPrices[j_sell] = sellBids[i];
+        tempVol--;
+        j_sell++;
+      }
+    }
+
+    // calculate the market clearing price
+    for (i = 0; i < buyPrices.length; i++) {
+      if (buyPrices[i] < sellPrices[i]) {
+        price = (buyPrices[i-1] + sellPrices[i-1])/2;
+        break;
+      } else if (buyPrices[i] == sellPrices[i]) {
+        price = buyPrices[i];
+      }
+    }
+
+    // find eligible buy bids
+    buyVolume = 0;
+    for (i = 0; i < buyBids.length; i++) {
+      if (buyBids[i] >= price) {
+        // Eligible buy bid
+        buyVolume += buyers[buyersArr[i]].energy;
+      }
+    }
+
+    // find eligible sell bids
+    sellVolume = 0;
+    for (i = 0; i < sellBids.length; i++) {
+      if (sellBids[i] <= price) {
+        // Eligible sell bid
+        sellVolume += sellers[sellersArr[i]].energy;
+      }
+    }
+
+    // volume that will be traded
+    uint256 vol = min(buyVolume, sellVolume);
+    // trade: find matching buy bids
+    i = 0;
+    uint256 tempVol = vol;
+    while (tempVol > 0) {
+      if (buyers[buyersArr[i]].energy <= tempVol) {
+        //Matching buyer and Quantity
+        tempVol -= buyers[buyersArr[i]].energy;
+        emit tradeEnergyBuyer(buyersArr[i], buyers[buyersArr[i]].energy);
+        i++;
+      } else {
+        //Matching buyer and Quantity
+        emit tradeEnergyBuyer(buyersArr[i], tempVol);
+        break;
+      }
+    }
+
+    // trade: find matching selling bids
+    i = 0;
+    tempVol = vol;
+    while (tempVol > 0) {
+      if (sellers[sellersArr[i]].energy <= tempVol) {
+        // Matching seller and Quantity
+        tempVol -= sellers[sellersArr[i]].energy;
+        emit tradeEnergySeller(sellersArr[i], sellers[sellersArr[i]].energy);
+        i++;
+      } else {
+        // Matching seller and Quantity
+        emit tradeEnergySeller(sellersArr[i], tempVol);
+        break;
+      }
+    }
+
   }
 
   function getPrice() public view returns (uint256) {
@@ -122,9 +217,9 @@ contract doubleAuction {
       // sort bidders array accordingly
       bidders[i] = bidders[i-1];
       bidders[i-1] = temp;
-      i--;
       key = arr[i];
       temp = bidders[i];
+      i--;
     }
     return (arr, bidders);
   }
@@ -141,11 +236,19 @@ contract doubleAuction {
       // sort bidders array accordingly
       bidders[i] = bidders[i-1];
       bidders[i-1] = temp;
-      i--;
       key = arr[i];
       temp = bidders[i];
+      i--;
     }
     return (arr, bidders);
+  }
+
+  function max(uint a, uint b) private pure returns (uint) {
+    return a > b ? a : b;
+  }
+
+  function min(uint a, uint b) private pure returns (uint) {
+    return a > b ? b : a;
   }
 
   // boolean functions for checking the differnt time periods
