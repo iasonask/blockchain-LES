@@ -69,7 +69,7 @@ contract retailer {
     require(isValidMeter(msg.sender), "Not a valid smart meter");
     require(isValidMeterSig(user, activeP_, meterSig), "Not a valid meter signature.");
     require(!consumers[user].hasDeclared, "Meter has already declared.");
-    require(consumers[user].meter == msg.sender, "Address of meter is different from the initialy declared.");
+    require(consumers[user].meter == msg.sender, "Address of meter is different from the one initialy declared.");
     consumers[user].activeConsumption = activeP_;
     consumers[user].hasDeclared = true;
   }
@@ -82,7 +82,7 @@ contract retailer {
     //return deposit to user
     msg.sender.transfer(consumers[msg.sender].deposit);
     if (consumers[msg.sender].activeConsumption*price < msg.value) {
-      // return possibly exceeding funds
+      // return exceeding funds
       msg.sender.transfer(msg.value - consumers[msg.sender].activeConsumption*price);
     }
   }
