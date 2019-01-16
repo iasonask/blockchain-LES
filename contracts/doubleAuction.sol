@@ -90,14 +90,14 @@ contract doubleAuction {
   function bidSeller(bytes32 bid, address meter, uint256 energy) public onlyBidding payable {
     // need to check for negative energy volume?? how?
     require(msg.value >= deposit, "Insufficient deposit.");
-    //require(isValidMeter(meter), "Meter not valid.");
+    require(isValidMeter(meter), "Meter not valid.");
     sellers[msg.sender] = seller(bid, energy, meter, msg.value, true, false, 0, 0, false, false);
     sellersArr.push(msg.sender);
   }
 
   function bidBuyer(bytes32 bid, address meter, uint256 energy) public onlyBidding payable {
     require(msg.value >= deposit, "Insufficient deposit.");
-    //require(isValidMeter(meter), "Meter not valid.");
+    require(isValidMeter(meter), "Meter not valid.");
     buyers[msg.sender] = buyer(bid, energy, meter, msg.value, true, false, 0, 0, false, false);
     buyersArr.push(msg.sender);
   }
