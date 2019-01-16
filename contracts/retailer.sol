@@ -1,7 +1,5 @@
 pragma solidity >=0.4.25 <0.6.0;
 
-import "./ECRecovery.sol";
-
 contract smartMeters {
   function isValidMeter(address) public pure returns (bool) {}
 }
@@ -65,9 +63,8 @@ contract retailer {
   }
 
   // smart meters declare autonomously their consumption
-  function declarePeriod (address user, uint256 activeP_, bytes memory meterSig) public onlyDeclare {
+  function declarePeriod (address user, uint256 activeP_) public onlyDeclare {
     require(isValidMeter(msg.sender), "Not a valid smart meter");
-    require(isValidMeterSig(user, activeP_, meterSig), "Not a valid meter signature.");
     require(!consumers[user].hasDeclared, "Meter has already declared.");
     require(consumers[user].meter == msg.sender, "Address of meter is different from the one initialy declared.");
     consumers[user].activeConsumption = activeP_;
@@ -95,11 +92,6 @@ contract retailer {
 
   function isValidMeter(address meter) public view returns(bool) {
     return smartMeterContract.isValidMeter(meter);
-  }
-  
-  function isValidMeterSig(address user, uint256 volume, bytes memory meterSig) public pure returns(bool) {
-    bytes32 hash_ = keccak256(abi.encodePacked(user, volume));
-    return user == ECRecovery.recover(hash_, meterSig);
   }
 
   // boolean functions for checking the differnt time periods

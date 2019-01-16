@@ -1,7 +1,5 @@
 pragma solidity >=0.4.25 <0.6.0;
 
-import "./ECRecovery.sol";
-
 contract smartMeters {
   function isValidMeter(address) public pure returns (bool) {}
 }
@@ -231,18 +229,16 @@ contract doubleAuction {
     }
   }
 
-  function energyDeclarationsBuyers(address buyer_, uint256 volume, bytes memory meterSig) public onlyDeclare {
+  function energyDeclarationsBuyers(address buyer_, uint256 volume) public onlyDeclare {
     require(!buyers[buyer_].hasDeclared, "Buyer has already declared.");
     require(isValidMeter(msg.sender), "Not a valid smart meter");
-    require(isValidMeterSig(buyer_, volume, meterSig), "Not a valid meter signature.");
     require(buyers[buyer_].meter == msg.sender, "Address of meter is different than the initialy declared.");
     buyers[buyer_].measuredVol = volume;
   }
 
-  function energyDeclarationsSellers(address seller_, uint256 volume, bytes memory meterSig) public onlyDeclare {
+  function energyDeclarationsSellers(address seller_, uint256 volume) public onlyDeclare {
     require(!sellers[seller_].hasDeclared, "Seller has already declared.");
     require(isValidMeter(msg.sender), "Not a valid smart meter");
-    require(isValidMeterSig(seller_, volume, meterSig), "Not a valid meter signature.");
     require(sellers[seller_].meter == msg.sender, "Address of meter is different than the initialy declared.");
     sellers[seller_].measuredVol = volume;
   }
@@ -286,11 +282,6 @@ contract doubleAuction {
 
   function isValidMeter(address meter) public view returns(bool) {
     return smartMeterContract.isValidMeter(meter);
-  }
-  
-  function isValidMeterSig(address user, uint256 volume, bytes memory meterSig) public pure returns(bool) {
-    bytes32 hash_ = keccak256(abi.encodePacked(user, volume));
-    return user == ECRecovery.recover(hash_, meterSig);
   }
 
   // detroy contract
