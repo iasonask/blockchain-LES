@@ -109,10 +109,7 @@ contract doubleAuction {
     sellBids.push(bidValue);
     (sellBids, sellersArr) = bidSortAscenting(sellBids, sellersArr);
     // calculate total energy volume
-    uint256 i;
-    for (i = 0; i < sellBids.length; i++) {
-      sellVolume += sellers[sellersArr[i]].energy;
-    }
+    sellVolume += sellers[msg.sender].energy;
   }
 
   function revealBuyer(bytes32 nonce, uint256 bidValue) public onlyReveal {
@@ -121,10 +118,7 @@ contract doubleAuction {
     buyBids.push(bidValue);
     (buyBids, buyersArr) = bidSortDescenting(buyBids, buyersArr);
     // calculate total energy volume
-    uint256 i;
-    for (i = 0; i < buyBids.length; i++) {
-      buyVolume += buyers[buyersArr[i]].energy;
-    }
+    buyVolume += buyers[msg.sender].energy;
   }
 
   // clear the market
@@ -171,7 +165,6 @@ contract doubleAuction {
     buyVolume = 0;
     for (i = 0; i < buyBids.length; i++) {
       if (buyBids[i] >= price) {
-        // Eligible buy bid
         buyVolume += buyers[buyersArr[i]].energy;
       }
     }
@@ -180,7 +173,6 @@ contract doubleAuction {
     sellVolume = 0;
     for (i = 0; i < sellBids.length; i++) {
       if (sellBids[i] <= price) {
-        // Eligible sell bid
         sellVolume += sellers[sellersArr[i]].energy;
       }
     }
@@ -232,14 +224,14 @@ contract doubleAuction {
   function energyDeclarationsBuyers(address buyer_, uint256 volume) public onlyDeclare {
     require(!buyers[buyer_].hasDeclared, "Buyer has already declared.");
     require(isValidMeter(msg.sender), "Not a valid smart meter");
-    require(buyers[buyer_].meter == msg.sender, "Address of meter is different than the initialy declared.");
+    require(buyers[buyer_].meter == msg.sender, "Address of meter is different than the one initialy declared.");
     buyers[buyer_].measuredVol = volume;
   }
 
   function energyDeclarationsSellers(address seller_, uint256 volume) public onlyDeclare {
     require(!sellers[seller_].hasDeclared, "Seller has already declared.");
     require(isValidMeter(msg.sender), "Not a valid smart meter");
-    require(sellers[seller_].meter == msg.sender, "Address of meter is different than the initialy declared.");
+    require(sellers[seller_].meter == msg.sender, "Address of meter is different than the one initialy declared.");
     sellers[seller_].measuredVol = volume;
   }
 
@@ -249,7 +241,7 @@ contract doubleAuction {
     require(!buyers[msg.sender].hasPayed, "Buyer has payed.");
     require(msg.value >= price*buyers[msg.sender].volToTrade, "Not enough funds.");
     require(buyers[msg.sender].isTrading, "Buyer cannot trade.");
-    // refund user
+    // refund user. What if the user consumes less or more than the initial bidding?
     if (msg.value > price*buyers[msg.sender].volToTrade) {
       msg.sender.transfer(msg.value - price*buyers[msg.sender].volToTrade);
     }
@@ -262,7 +254,7 @@ contract doubleAuction {
     require(sellers[msg.sender].isSubscribed, "Seller is not subscribed!");
     require(!sellers[msg.sender].hasBeenPayed, "Seller has been payed.");
     require(sellers[msg.sender].isTrading, "Seller cannot trade.");
-    // refund seller
+    // refund seller according to its actual production
     uint256 refund = price*min(sellers[msg.sender].measuredVol, sellers[msg.sender].volToTrade);
     msg.sender.transfer(refund);
     
