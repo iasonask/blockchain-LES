@@ -5,7 +5,7 @@ contract smartMeters {
   address owner;
 
   struct meter {
-    bool isSubscribed;
+    bool isRegistered;
     // other relevant parameters
   }
   mapping (address => meter) meters;
@@ -17,18 +17,18 @@ contract smartMeters {
     emit deployMeterService(msg.sender, address(this));
   }
 
-  function insertMeter(address meter_) public onlyOwner {
+  function registerMeter(address meter_) public onlyOwner {
     require(!meters[meter_].isSubscribed, "Meter already subscribed.");
-    meters[meter_].isSubscribed = true;
+    meters[meter_].isRegistered = true;
   }
 
-  function removeMeter(address meter_) public onlyOwner {
+  function unregisterMeter(address meter_) public onlyOwner {
     require(meters[meter_].isSubscribed, "Meter isn't subscribed.");
-    meters[meter_].isSubscribed = false;
+    meters[meter_].isRegistered = false;
   }
 
   function isValidMeter(address meter_) public view returns (bool) {
-    return meters[meter_].isSubscribed;
+    return meters[meter_].isRegistered;
   }
 
   function destroy() public onlyOwner {
