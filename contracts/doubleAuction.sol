@@ -1,8 +1,6 @@
 pragma solidity >=0.4.25 <0.6.0;
 
-contract smartMeters {
-  function isValidMeter(address) public pure returns (bool) {}
-}
+import "./smartMeters.sol";
 
 contract doubleAuction {
   address owner;
@@ -56,14 +54,11 @@ contract doubleAuction {
   uint256 t5;
   uint256 t6;
   uint256 deposit;
-  uint256 price;
+  uint256 public price;
   
   // event to inform smart meters for declaring energy consumption
   event subscriptionBuyer(address meter, address user, uint256 t3, uint256 t4,  uint256 t5);
   event subscriptionSeller(address meter, address user, uint256 t3, uint256 t4,  uint256 t5);
-
-  // event to inform consumers for participating in the energy auction
-  event deployEnergyAuction(address retailer_con, uint256 t1, uint256 t2, uint256 t3, uint256 t4,  uint256 t5, uint256 t6);
 
   // inform potential buyers and sellers for trading
   event tradeEnergyBuyer(address buyer, uint256 energyVolume);
@@ -76,14 +71,13 @@ contract doubleAuction {
     owner = msg.sender;
     t0 = getBlockNumber();
     t1 = t0 + t1_;
-    t2 = t1 + t2_;
-    t3 = t2 + t3_;
-    t4 = t3 + t4_;
-    t5 = t4 + t5_;
-    t6 = t5 + t6_;
+    t2 = t0 + t2_;
+    t3 = t0 + t3_;
+    t4 = t0 + t4_;
+    t5 = t0 + t5_;
+    t6 = t0 + t6_;
     deposit = deposit_;
     smartMeterContract = smartMeters(meterProvider);
-    emit deployEnergyAuction (address(this), t1, t2, t3, t4, t5, t6);
   }
 
   //make bids
@@ -242,7 +236,7 @@ contract doubleAuction {
     require(msg.value >= price*buyers[msg.sender].volToTrade, "Not enough funds.");
     require(buyers[msg.sender].isTrading, "Buyer cannot trade.");
     // refund user. What if the user consumes less or more than the initial bidding?
-    if (msg.value > price*buyers[msg.sender].volToTrade) {
+    if (msg.value > price * buyers[msg.sender].volToTrade) {
       msg.sender.transfer(msg.value - price*buyers[msg.sender].volToTrade);
     }
     // return also initial deposit

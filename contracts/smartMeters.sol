@@ -10,20 +10,19 @@ contract smartMeters {
   }
   mapping (address => meter) meters;
 
-  event deployMeterService(address meterProvider, address meterContract);
+  // assume that the users knows the address of the contract
 
   constructor () public {
     owner = msg.sender;
-    emit deployMeterService(msg.sender, address(this));
   }
 
   function registerMeter(address meter_) public onlyOwner {
-    require(!meters[meter_].isSubscribed, "Meter already subscribed.");
+    require(!meters[meter_].isRegistered, "Meter already subscribed.");
     meters[meter_].isRegistered = true;
   }
 
   function unregisterMeter(address meter_) public onlyOwner {
-    require(meters[meter_].isSubscribed, "Meter isn't subscribed.");
+    require(meters[meter_].isRegistered, "Meter isn't subscribed.");
     meters[meter_].isRegistered = false;
   }
 
