@@ -9,7 +9,7 @@ const chaiAsPromised = require('chai-as-promised')
 
 chai.use(chaiAsPromised)
 
-const eth = web3.toWei('1', 'ether')
+const eth = web3.utils.toWei('1', 'ether')
 
 contract('Retailer', (accounts) => {
   beforeEach(async () => {

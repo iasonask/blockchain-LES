@@ -82,7 +82,6 @@ contract doubleAuction {
 
   //make bids
   function bidSeller(bytes32 bid, address meter, uint256 energy) public onlyBidding payable {
-    // need to check for negative energy volume?? how?
     require(msg.value >= deposit, "Insufficient deposit.");
     require(isValidMeter(meter), "Meter not valid.");
     sellers[msg.sender] = seller(bid, energy, meter, msg.value, true, false, 0, 0, false, false);
@@ -352,29 +351,29 @@ contract doubleAuction {
     return block.number;
   }
 
-  //modifiers
+  // cansel modifiers  for simplified testing
   modifier onlyBidding {
-    require(isBiddingPeriod(), "Bidding period has not started or has already ended.");
+    // require(isBiddingPeriod(), "Bidding period has not started or has already ended.");
     _;
   }
 
   modifier onlyReveal {
-    require(isRevealPeriod(), "Reveal period has not started or has already ended.");
+    // require(isRevealPeriod(), "Reveal period has not started or has already ended.");
     _;
   }
 
   modifier onlyMatching {
-    require(isMatchingPeriod(), "Matching period has not started or has already ended.");
+    // require(isMatchingPeriod(), "Matching period has not started or has already ended.");
     _;
   }
 
   modifier onlyDeclare {
-    require(isDeclarationPeriod(), "Declaration period has not started or has already ended.");
+    // require(isDeclarationPeriod(), "Declaration period has not started or has already ended.");
     _;
   }
 
   modifier onlyPay {
-    require(isPaymentPeriod(), "Payment period has not started or has already ended.");
+    // require(isPaymentPeriod(), "Payment period has not started or has already ended.");
     _;
   }
 
