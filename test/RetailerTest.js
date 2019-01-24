@@ -37,4 +37,13 @@ contract('Retailer', (accounts) => {
     await this.retailer.declarePeriod(user, 10, { from: meter })
     await this.retailer.paymentPeriod({ from: user })
   })
+
+  it('should finalize', async () => {
+    await this.smartMeter.registerMeter(meter)
+    await this.retailer.subscribeUser(meter, { from: user, value: eth })
+    await this.retailer.declarePeriod(user, 10, { from: meter })
+    await this.retailer.paymentPeriod({ from: user })
+    await this.retailer.finalize()
+  })
+
 })

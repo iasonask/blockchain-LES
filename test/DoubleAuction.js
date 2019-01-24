@@ -13,6 +13,8 @@ chai.use(chaiAsPromised)
 
 const eth = web3.utils.toWei('1', 'ether')
 
+const number_of_participants = 10 //*2
+
 const addParticipants = async (smartMeter, auction, buyers, sellers) => {
   for (let buyer of buyers) {
     await smartMeter.registerMeter(buyer.meter)
@@ -34,6 +36,26 @@ const revealBids = async (auction, buyers, sellers) => {
     await auction.revealSeller(web3.utils.toHex(seller.nonce), web3.utils.toHex(seller.price), { from: seller.address })
   }
 }
+const declareEnergy = async (auction, buyers, sellers) => {
+  for (let buyer of buyers) {
+    await auction.energyDeclarationsBuyers(buyer.address, getRandomInt(1, 7), { from: buyer.address })
+  }
+
+  for (let seller of sellers) {
+    await auction.energyDeclarationsSellers(seller.address, getRandomInt(1, 7), { from: seller.address })
+  }
+}
+
+const sendReceivePayments = async (auction, buyers, sellers) => {
+  for (let buyer of buyers) {
+    await auction.sendPayment({ from: buyer.address, value: eth })
+  }
+
+  for (let seller of sellers) {
+    await auction.receivePayment({ from: seller.address })
+  }
+}
+
 contract('Double Auction', (accounts) => {
   beforeEach(async () => {
     this.smartMeter = await SmartMeters.new()
@@ -43,12 +65,12 @@ contract('Double Auction', (accounts) => {
   const buyers = []
   const sellers = []
 
-  for (let i = 0; i < 50; i++) {
-    buyers.push({ address: accounts[i], meter: accounts[i + 1], price: getRandomInt(800, 2000), volume: getRandomInt(1, 7), nonce: i })
+  for (let i = 0; i < number_of_participants; i++) {
+    buyers.push({ address: accounts[i], meter: accounts[i], price: getRandomInt(800, 2000), volume: getRandomInt(1, 7), nonce: i })
   }
 
-  for (let i = 50; i < 99; i++) {
-    sellers.push({ address: accounts[i], meter: accounts[i + 1], price: getRandomInt(800, 2000), volume: getRandomInt(1, 7), nonce: i })
+  for (let i = number_of_participants; i < 2 * number_of_participants - 1; i++) {
+    sellers.push({ address: accounts[i], meter: accounts[i], price: getRandomInt(800, 2000), volume: getRandomInt(1, 7), nonce: i })
   }
 
   // it('Add bidders', async () => {
@@ -64,5 +86,8 @@ contract('Double Auction', (accounts) => {
     await addParticipants(this.smartMeter, this.doubleAuction, buyers, sellers)
     await revealBids(this.doubleAuction, buyers, sellers)
     await this.doubleAuction.clearMarket()
+    await declareEnergy(this.doubleAuction, buyers, sellers)
+    await sendReceivePayments(this.doubleAuction, buyers, sellers)
+    await this.doubleAuction.finalize()
   })
 })
