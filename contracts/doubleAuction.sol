@@ -232,13 +232,15 @@ contract doubleAuction {
   function sendPayment() public onlyPay payable {
     require(buyers[msg.sender].isSubscribed, "Buyer is not subscribed!");
     require(!buyers[msg.sender].hasPayed, "Buyer has payed.");
-    require(msg.value >= price*buyers[msg.sender].volToTrade, "Not enough funds.");
-    require(buyers[msg.sender].isTrading, "Buyer cannot trade.");
-    // refund user. What if the user consumes less or more than the initial bidding?
-    if (msg.value > price * buyers[msg.sender].volToTrade) {
-      msg.sender.transfer(msg.value - price*buyers[msg.sender].volToTrade);
+    // require(msg.value >= price*buyers[msg.sender].volToTrade, "Not enough funds.");
+    if (buyers[msg.sender].isTrading) {
+      // refund user. What if the user consumes less or more than the initial bidding?
+      if (msg.value > price * buyers[msg.sender].volToTrade) {
+        msg.sender.transfer(msg.value - price*buyers[msg.sender].volToTrade);
+      }  
     }
-    // return also initial deposit
+    
+    // return initial deposit
     msg.sender.transfer(buyers[msg.sender].deposit);
     buyers[msg.sender].hasPayed = true;    
   }
@@ -246,10 +248,11 @@ contract doubleAuction {
   function receivePayment() public onlyPay {
     require(sellers[msg.sender].isSubscribed, "Seller is not subscribed!");
     require(!sellers[msg.sender].hasBeenPayed, "Seller has been payed.");
-    require(sellers[msg.sender].isTrading, "Seller cannot trade.");
-    // refund seller according to its actual production
-    uint256 refund = price*min(sellers[msg.sender].measuredVol, sellers[msg.sender].volToTrade);
-    msg.sender.transfer(refund);
+    if (sellers[msg.sender].isTrading) {
+      // refund seller according to its actual production
+      uint256 refund = price*min(sellers[msg.sender].measuredVol, sellers[msg.sender].volToTrade);
+      msg.sender.transfer(refund);
+    }
     
     // return also initial deposit
     msg.sender.transfer(sellers[msg.sender].deposit);
@@ -271,7 +274,7 @@ contract doubleAuction {
 
   // detroy contract
   function finalize() public onlyOwner {
-    require(isFinalizationPeriod(), "Finalization period has not yet arrived.");
+    // require(isFinalizationPeriod(), "Finalization period has not yet arrived.");
     selfdestruct(msg.sender);
   }
 
@@ -295,7 +298,7 @@ contract doubleAuction {
     return (arr, bidders);
   }
 
-  function bidSortDescenting(uint[] memory arr, address[] memory bidders) private pure returns (uint[] memory, address[] memory) { 
+  function bidSortDescenting(uint[] memory arr, address[] memory bidders) private pure returns (uint[] memory, address[] memory) {
     uint256 n = arr.length;
     uint256 i = n-1;
     uint256 key = arr[i];
