@@ -5,6 +5,7 @@ import "./smartMeters.sol";
 contract doubleAuction {
   address owner;
   uint256 constant INITIAL_DEPOSIT = 0;
+  uint256 market_price;
 
   // sellers data
   struct seller {
@@ -64,9 +65,8 @@ contract doubleAuction {
   event tradeEnergyBuyer(address buyer, uint256 energyVolume);
   event tradeEnergySeller(address seller, uint256 energyVolume);
 
-  constructor (address meterProvider, uint256 t1_, uint256 t2_, 
-  uint256 t3_,  uint256 t4_, uint256 t5_,  uint256 t6_, 
-  uint256 deposit_) public payable {
+  constructor (address meterProvider, uint256 t1_, uint256 t2_, uint256 t3_, uint256 t4_, 
+  uint256 t5_, uint256 t6_, uint256 market_price_, uint256 deposit_) public payable {
     require(msg.value >= INITIAL_DEPOSIT, "Contract instantiation requires INITIAL_DEPOSIT.");
     owner = msg.sender;
     t0 = getBlockNumber();
@@ -77,6 +77,7 @@ contract doubleAuction {
     t5 = t0 + t5_;
     t6 = t0 + t6_;
     deposit = deposit_;
+    market_price = market_price_;
     smartMeterContract = smartMeters(meterProvider);
   }
 
@@ -219,6 +220,7 @@ contract doubleAuction {
     require(isValidMeter(msg.sender), "Not a valid smart meter");
     require(buyers[buyer_].meter == msg.sender, "Address of meter is different than the one initialy declared.");
     buyers[buyer_].measuredVol = volume;
+    buyers[buyer_].hasDeclared = true;
   }
 
   function energyDeclarationsSellers(address seller_, uint256 volume) public onlyDeclare {
@@ -226,27 +228,32 @@ contract doubleAuction {
     require(isValidMeter(msg.sender), "Not a valid smart meter");
     require(sellers[seller_].meter == msg.sender, "Address of meter is different than the one initialy declared.");
     sellers[seller_].measuredVol = volume;
+    sellers[seller_].hasDeclared = true;
   }
 
-  // buyers send their payments
-  function sendPayment() public onlyPay payable {
+  // buyers are refunded
+  function sendPayment() public onlyPay {
     require(buyers[msg.sender].isSubscribed, "Buyer is not subscribed!");
+    require(buyers[msg.sender].hasDeclared, "Buyer has not declared consumption!");
     require(!buyers[msg.sender].hasPayed, "Buyer has payed.");
-    // require(msg.value >= price*buyers[msg.sender].volToTrade, "Not enough funds.");
     if (buyers[msg.sender].isTrading) {
-      // refund user. What if the user consumes less or more than the initial bidding?
-      if (msg.value > price * buyers[msg.sender].volToTrade) {
-        msg.sender.transfer(msg.value - price*buyers[msg.sender].volToTrade);
-      }  
+      // refund user
+      uint256 refund = buyers[msg.sender].deposit - price*buyers[msg.sender].volToTrade;
+      if (buyers[msg.sender].measuredVol > buyers[msg.sender].volToTrade) {
+        // check if user has consumed more than he bought locally and charge him with the market_price
+        refund -= market_price*(buyers[msg.sender].measuredVol - buyers[msg.sender].volToTrade);
+      }
+      msg.sender.transfer(refund);
+    } else {
+      // the user is paying the energy he consumed with the market_price
+      msg.sender.transfer(buyers[msg.sender].deposit - market_price*buyers[msg.sender].measuredVol);
     }
-    
-    // return initial deposit
-    msg.sender.transfer(buyers[msg.sender].deposit);
-    buyers[msg.sender].hasPayed = true;    
+    buyers[msg.sender].hasPayed = true; 
   }
 
   function receivePayment() public onlyPay {
     require(sellers[msg.sender].isSubscribed, "Seller is not subscribed!");
+    require(sellers[msg.sender].hasDeclared, "Seller has not declared production");
     require(!sellers[msg.sender].hasBeenPayed, "Seller has been payed.");
     if (sellers[msg.sender].isTrading) {
       // refund seller according to its actual production
