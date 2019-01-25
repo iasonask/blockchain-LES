@@ -11,7 +11,7 @@ const { getRandomInt } = require('./helpers')
 
 chai.use(chaiAsPromised)
 
-const eth = web3.utils.toWei('1', 'ether')
+const eth = web3.utils.toWei('10', 'ether')
 
 const number_of_participants = 10 //*2
 
@@ -48,7 +48,7 @@ const declareEnergy = async (auction, buyers, sellers) => {
 
 const sendReceivePayments = async (auction, buyers, sellers) => {
   for (let buyer of buyers) {
-    await auction.sendPayment({ from: buyer.address, value: eth })
+    await auction.sendPayment({ from: buyer.address })
   }
 
   for (let seller of sellers) {
@@ -59,17 +59,17 @@ const sendReceivePayments = async (auction, buyers, sellers) => {
 contract('Double Auction', (accounts) => {
   beforeEach(async () => {
     this.smartMeter = await SmartMeters.new()
-    this.doubleAuction = await DoubleAuction.new(this.smartMeter.address, 9, 13, 24, 16, 6, 7, eth)
+    this.doubleAuction = await DoubleAuction.new(this.smartMeter.address, 9, 13, 24, 16, 6, 7, 2000, eth)
   })
 
   const buyers = []
   const sellers = []
 
-  for (let i = 0; i < number_of_participants; i++) {
+  for (let i = 1; i < number_of_participants + 1; i++) {
     buyers.push({ address: accounts[i], meter: accounts[i], price: getRandomInt(800, 2000), volume: getRandomInt(1, 7), nonce: i })
   }
 
-  for (let i = number_of_participants; i < 2 * number_of_participants - 1; i++) {
+  for (let i = number_of_participants + 1; i < 2 * number_of_participants + 1; i++) {
     sellers.push({ address: accounts[i], meter: accounts[i], price: getRandomInt(800, 2000), volume: getRandomInt(1, 7), nonce: i })
   }
 
@@ -86,6 +86,7 @@ contract('Double Auction', (accounts) => {
     await addParticipants(this.smartMeter, this.doubleAuction, buyers, sellers)
     await revealBids(this.doubleAuction, buyers, sellers)
     await this.doubleAuction.clearMarket()
+    // console.log(await this.doubleAuction.getPrice())
     await declareEnergy(this.doubleAuction, buyers, sellers)
     await sendReceivePayments(this.doubleAuction, buyers, sellers)
     await this.doubleAuction.finalize()
